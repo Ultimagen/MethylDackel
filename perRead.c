@@ -42,7 +42,7 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
     uint32_t *CIGAR = bam_get_cigar(b);
     uint8_t *readSeq = bam_get_seq(b);
     uint8_t *readQual = bam_get_qual(b);
-    int strand = getStrand(b);
+    int strand = getStrand(b, config->reversed);
     int cigarOPType;
     int direction;
     int base;
@@ -265,6 +265,10 @@ void perRead_usage() {
 " -@ INT     The number of threads to use, the default 1\n"
 " --chunkSize INT  The size of the genome processed by a single thread at a time.\n"
 "            The default is 1000000 bases. This value MUST be at least 1.\n"
+" --reversed Reverse the strand assignment of reads. Use this for libraries\n"
+"            where the conversion chemistry and/or amplification has flipped\n"
+"            the expected strand (e.g., TAPS with linear amplification).\n"
+"            This swaps OT<->OB and CTOT<->CTOB.\n"
 " --version  Print version and quit\n"
 "\n"
 "Note that this program will produce incorrect values for alignments spanning\n"
@@ -284,6 +288,7 @@ int perRead_main(int argc, char *argv[]) {
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
     config.ignoreNH = 0;
+    config.reversed = 0;
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
@@ -299,6 +304,8 @@ int perRead_main(int argc, char *argv[]) {
         {"version", 0, NULL, 'v'},
         {"chunkSize",    1, NULL,  19},
         {"keepStrand",   0, NULL,  20},
+        {"ignoreNH",     0, NULL,  21},
+        {"reversed",     0, NULL,  22},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {0,         0, NULL,   0}
@@ -350,6 +357,9 @@ int perRead_main(int argc, char *argv[]) {
             break;
         case 21:
             config.ignoreNH = 1;
+            break;
+        case 22:
+            config.reversed = 1;
             break;
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);
