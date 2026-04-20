@@ -65,12 +65,14 @@ void processRead(Config *config, bam1_t *b, char *seq, uint32_t sequenceStart, i
                 direction = isCpG(seq, mappedPosition - sequenceStart, seqLen);
                 if(direction) {
                     base = bam_seqi(readSeq, readPosition);  // Filtering by quality goes here
+                    uint32_t *plus  = config->methylated_cytosine_converted ? nunmethyl : nmethyl;
+                    uint32_t *minus = config->methylated_cytosine_converted ? nmethyl   : nunmethyl;
                     if(direction == 1 && (strand & 1) == 1) { // C & OT/CTOT
-                        if(base == 2) (*nmethyl)++;  //C
-                        else if(base == 8) (*nunmethyl)++; //T
+                        if(base == 2) (*plus)++;  //C
+                        else if(base == 8) (*minus)++; //T
                     } else if(direction == -1 && (strand & 1) == 0) { // G & OB/CTOB
-                        if(base == 4) (*nmethyl)++;  //G
-                        else if(base == 1) (*nunmethyl)++; //A
+                        if(base == 4) (*plus)++;  //G
+                        else if(base == 1) (*minus)++; //A
                     }
                 }
                 mappedPosition++;
@@ -269,6 +271,10 @@ void perRead_usage() {
 "            where the conversion chemistry and/or amplification has flipped\n"
 "            the expected strand (e.g., TAPS with linear amplification).\n"
 "            This swaps OT<->OB and CTOT<->CTOB.\n"
+" --methylated-cytosine-converted\n"
+"            Treat C->T (on OT/CTOT) and G->A (on OB/CTOB) as methylated\n"
+"            rather than unmethylated cytosines. Use for chemistries where\n"
+"            the converted base indicates methylation (e.g. TAPS).\n"
 " --version  Print version and quit\n"
 "\n"
 "Note that this program will produce incorrect values for alignments spanning\n"
@@ -289,6 +295,7 @@ int perRead_main(int argc, char *argv[]) {
     config.keepSingleton = 0, config.keepDiscordant = 0;
     config.ignoreNH = 0;
     config.reversed = 0;
+    config.methylated_cytosine_converted = 0;
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
@@ -306,6 +313,7 @@ int perRead_main(int argc, char *argv[]) {
         {"keepStrand",   0, NULL,  20},
         {"ignoreNH",     0, NULL,  21},
         {"reversed",     0, NULL,  22},
+        {"methylated-cytosine-converted", 0, NULL, 23},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {0,         0, NULL,   0}
@@ -360,6 +368,9 @@ int perRead_main(int argc, char *argv[]) {
             break;
         case 22:
             config.reversed = 1;
+            break;
+        case 23:
+            config.methylated_cytosine_converted = 1;
             break;
         default :
             fprintf(stderr, "Invalid option '%c'\n", c);

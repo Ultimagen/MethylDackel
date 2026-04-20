@@ -703,6 +703,12 @@ void extract_usage() {
 "                  where the conversion chemistry and/or amplification has\n"
 "                  flipped the expected strand (e.g., TAPS with linear\n"
 "                  amplification). This swaps OT<->OB and CTOT<->CTOB.\n"
+" --methylated-cytosine-converted\n"
+"                  Treat C->T (on OT/CTOT) and G->A (on OB/CTOB) as\n"
+"                  methylated rather than unmethylated cytosines. Use this\n"
+"                  for chemistries where the converted base indicates\n"
+"                  methylation (e.g. TAPS), as opposed to bisulfite where\n"
+"                  the converted base indicates the unmethylated state.\n"
 " --version        Print version and then quit.\n"
 "\nNote that --fraction, --counts, and --logit are mutually exclusive!\n");
 }
@@ -731,6 +737,7 @@ int extract_main(int argc, char *argv[]) {
     config.keepSingleton = 0, config.keepDiscordant = 0;
     config.ignoreNH = 0;
     config.reversed = 0;
+    config.methylated_cytosine_converted = 0;
     config.minDepth = 1;
     config.methylKit = 0;
     config.merge = 0;
@@ -787,6 +794,7 @@ int extract_main(int argc, char *argv[]) {
         {"minConversionEfficiency", 1, NULL, 22},
         {"ignoreNH",     0, NULL, 23},
         {"reversed",     0, NULL, 24},
+        {"methylated-cytosine-converted", 0, NULL, 25},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -901,6 +909,9 @@ int extract_main(int argc, char *argv[]) {
             break;
         case 24:
             config.reversed = 1;
+            break;
+        case 25:
+            config.methylated_cytosine_converted = 1;
             break;
         case 'M':
             config.BWName = optarg;

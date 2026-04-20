@@ -133,10 +133,13 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     //Is the phred score even high enough?
     if(bam_get_qual(plp->b)[plp->qpos] < config->minPhred) return 0;
 
-    if(base == 2 && (strand==1 || strand==3)) return 1; //C on an OT/CTOT alignment
-    else if(base == 8 && (strand==1 || strand==3)) return -1; //T on an OT/CTOT alignment
-    else if(base == 4 && (strand==2 || strand==4)) return 1; //G on an OB/CTOB alignment
-    else if(base == 1 && (strand==2 || strand==4)) return -1; //A on an OB/CTOB alignment
+    int meth = config->methylated_cytosine_converted ? -1 : 1;
+    int unmeth = -meth;
+
+    if(base == 2 && (strand==1 || strand==3)) return meth; //C on an OT/CTOT alignment
+    else if(base == 8 && (strand==1 || strand==3)) return unmeth; //T on an OT/CTOT alignment
+    else if(base == 4 && (strand==2 || strand==4)) return meth; //G on an OB/CTOB alignment
+    else if(base == 1 && (strand==2 || strand==4)) return unmeth; //A on an OB/CTOB alignment
     return 0;
 }
 
@@ -353,10 +356,13 @@ int getMethylState(bam1_t *b, int seqPos, Config *config) {
     //Is the phred score even high enough?
     if(bam_get_qual(b)[seqPos] < config->minPhred) return 0;
 
-    if(base == 2 && (strand==1 || strand==3)) return 1; //C on an OT/CTOT alignment
-    else if(base == 8 && (strand==1 || strand==3)) return -1; //T on an OT/CTOT alignment
-    else if(base == 4 && (strand==2 || strand==4)) return 1; //G on an OB/CTOB alignment
-    else if(base == 1 && (strand==2 || strand==4)) return -1; //A on an OB/CTOB alignment
+    int meth = config->methylated_cytosine_converted ? -1 : 1;
+    int unmeth = -meth;
+
+    if(base == 2 && (strand==1 || strand==3)) return meth; //C on an OT/CTOT alignment
+    else if(base == 8 && (strand==1 || strand==3)) return unmeth; //T on an OT/CTOT alignment
+    else if(base == 4 && (strand==2 || strand==4)) return meth; //G on an OB/CTOB alignment
+    else if(base == 1 && (strand==2 || strand==4)) return unmeth; //A on an OB/CTOB alignment
     return 0;
 }
 

@@ -302,6 +302,11 @@ void mbias_usage() {
 "                  where the conversion chemistry and/or amplification has\n"
 "                  flipped the expected strand (e.g., TAPS with linear\n"
 "                  amplification). This swaps OT<->OB and CTOT<->CTOB.\n"
+" --methylated-cytosine-converted\n"
+"                  Treat C->T (on OT/CTOT) and G->A (on OB/CTOB) as\n"
+"                  methylated rather than unmethylated cytosines. Use this\n"
+"                  for chemistries where the converted base indicates\n"
+"                  methylation (e.g. TAPS).\n"
 " --version        Print version and the quit\n");
 }
 
@@ -318,6 +323,7 @@ int mbias_main(int argc, char *argv[]) {
     config.keepSingleton = 0, config.keepDiscordant = 0;
     config.filterMappability = 0, config.ignoreNH = 0;
     config.reversed = 0;
+    config.methylated_cytosine_converted = 0;
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
@@ -349,6 +355,7 @@ int mbias_main(int argc, char *argv[]) {
         {"minConversionEfficiency", 1, NULL, 15},
         {"ignoreNH",     0, NULL,  16},
         {"reversed",     0, NULL,  17},
+        {"methylated-cytosine-converted", 0, NULL, 18},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -427,6 +434,9 @@ int mbias_main(int argc, char *argv[]) {
             break;
         case 17:
             config.reversed = 1;
+            break;
+        case 18:
+            config.methylated_cytosine_converted = 1;
             break;
         case 'F' :
             config.ignoreFlags = atoi(optarg);

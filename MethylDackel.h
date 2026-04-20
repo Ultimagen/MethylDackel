@@ -94,6 +94,7 @@ typedef struct {
     int merge, methylKit, minOppositeDepth;
     int ignoreNH;
     int reversed;
+    int methylated_cytosine_converted;
     double maxVariantFrac;
     int fraction, counts, logit;
     int cytosine_report;
