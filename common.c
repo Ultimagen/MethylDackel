@@ -81,43 +81,50 @@ inline int isCHH(char *seq, int pos, int seqlen) {
     return 0;
 }
 
-int getStrand(bam1_t *b) {
+int getStrand(bam1_t *b, int reversed) {
+    int strand = 0;
     char *XG = (char *) bam_aux_get(b, "XG");
     //Only bismark uses the XG tag like this. Some other aligners use it for other purposes...
     if(XG != NULL && *(XG+1) != 'C' && *(XG+1) != 'G') XG = NULL;
     if(XG == NULL) { //Can't handle non-directional libraries!
         if(b->core.flag & BAM_FPAIRED) {
-            if((b->core.flag & 0x50) == 0x50) return 2; //Read1, reverse comp. == OB
-            else if(b->core.flag & 0x40) return 1; //Read1, forward == OT
-            else if((b->core.flag & 0x90) == 0x90) return 1; //Read2, reverse comp. == OT
-            else if(b->core.flag & 0x80) return 2; //Read2, forward == OB
-            return 0; //One of the above should be set!
+            if((b->core.flag & 0x50) == 0x50) strand = 2; //Read1, reverse comp. == OB
+            else if(b->core.flag & 0x40) strand = 1; //Read1, forward == OT
+            else if((b->core.flag & 0x90) == 0x90) strand = 1; //Read2, reverse comp. == OT
+            else if(b->core.flag & 0x80) strand = 2; //Read2, forward == OB
+            //else strand remains 0 - one of the above should be set!
         } else {
-            if(b->core.flag & 0x10) return 2; //Reverse comp. == OB
-            return 1; //OT
+            if(b->core.flag & 0x10) strand = 2; //Reverse comp. == OB
+            else strand = 1; //OT
         }
     } else {
         if(*(XG+1) == 'C') { //OT or CTOT, due to C->T converted genome
-            if((b->core.flag & 0x51) == 0x41) return 1; //Read#1 forward == OT
-            else if((b->core.flag & 0x51) == 0x51) return 3; //Read #1 reverse == CTOT
-            else if((b->core.flag & 0x91) == 0x81) return 3; //Read #2 forward == CTOT
-            else if((b->core.flag & 0x91) == 0x91) return 1; //Read #2 reverse == OT
-            else if(b->core.flag & 0x10) return 3; //Single-end reverse == CTOT
-            else return 1; //Single-end forward == OT
+            if((b->core.flag & 0x51) == 0x41) strand = 1; //Read#1 forward == OT
+            else if((b->core.flag & 0x51) == 0x51) strand = 3; //Read #1 reverse == CTOT
+            else if((b->core.flag & 0x91) == 0x81) strand = 3; //Read #2 forward == CTOT
+            else if((b->core.flag & 0x91) == 0x91) strand = 1; //Read #2 reverse == OT
+            else if(b->core.flag & 0x10) strand = 3; //Single-end reverse == CTOT
+            else strand = 1; //Single-end forward == OT
         } else {
-            if((b->core.flag & 0x51) == 0x41) return 4; //Read#1 forward == CTOB
-            else if((b->core.flag & 0x51) == 0x51) return 2; //Read #1 reverse == OB
-            else if((b->core.flag & 0x91) == 0x81) return 2; //Read #2 forward == OB
-            else if((b->core.flag & 0x91) == 0x91) return 4; //Read #2 reverse == CTOB
-            else if(b->core.flag & 0x10) return 2; //Single-end reverse == OB
-            else return 4; //Single-end forward == CTOB
+            if((b->core.flag & 0x51) == 0x41) strand = 4; //Read#1 forward == CTOB
+            else if((b->core.flag & 0x51) == 0x51) strand = 2; //Read #1 reverse == OB
+            else if((b->core.flag & 0x91) == 0x81) strand = 2; //Read #2 forward == OB
+            else if((b->core.flag & 0x91) == 0x91) strand = 4; //Read #2 reverse == CTOB
+            else if(b->core.flag & 0x10) strand = 2; //Single-end reverse == OB
+            else strand = 4; //Single-end forward == CTOB
         }
     }
+    if(reversed && strand > 0) {
+        // Swap OT(1)↔OB(2) and CTOT(3)↔CTOB(4)
+        static const int swap[] = {0, 2, 1, 4, 3};
+        strand = swap[strand];
+    }
+    return strand;
 }
 
 int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     uint8_t base = bam_seqi(bam_get_seq(plp->b), plp->qpos);
-    int strand = getStrand(plp->b); //1=OT, 2=OB, 3=CTOT, 4=CTOB
+    int strand = getStrand(plp->b, config->reversed); //1=OT, 2=OB, 3=CTOT, 4=CTOB
 
     if(strand==0) {
         fprintf(stderr, "Can't determine the strand of a read!\n");
@@ -126,16 +133,19 @@ int updateMetrics(Config *config, const bam_pileup1_t *plp) {
     //Is the phred score even high enough?
     if(bam_get_qual(plp->b)[plp->qpos] < config->minPhred) return 0;
 
-    if(base == 2 && (strand==1 || strand==3)) return 1; //C on an OT/CTOT alignment
-    else if(base == 8 && (strand==1 || strand==3)) return -1; //T on an OT/CTOT alignment
-    else if(base == 4 && (strand==2 || strand==4)) return 1; //G on an OB/CTOB alignment
-    else if(base == 1 && (strand==2 || strand==4)) return -1; //A on an OB/CTOB alignment
+    int meth = config->methylated_cytosine_converted ? -1 : 1;
+    int unmeth = -meth;
+
+    if(base == 2 && (strand==1 || strand==3)) return meth; //C on an OT/CTOT alignment
+    else if(base == 8 && (strand==1 || strand==3)) return unmeth; //T on an OT/CTOT alignment
+    else if(base == 4 && (strand==2 || strand==4)) return meth; //G on an OB/CTOB alignment
+    else if(base == 1 && (strand==2 || strand==4)) return unmeth; //A on an OB/CTOB alignment
     return 0;
 }
 
 //Convert bases outside of the bounds to N and their phred scores to 0
-bam1_t *trimAlignment(bam1_t *b, int bounds[16]) {
-    int strand = getStrand(b)-1;
+bam1_t *trimAlignment(bam1_t *b, int bounds[16], int reversed) {
+    int strand = getStrand(b, reversed)-1;
     int i, lb, rb;
     uint8_t *qual = bam_get_qual(b);
     uint8_t *seq = bam_get_seq(b);
@@ -171,8 +181,8 @@ bam1_t *trimAlignment(bam1_t *b, int bounds[16]) {
     return b;
 }
 
-bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16]) {
-    int strand = getStrand(b)-1;
+bam1_t *trimAbsoluteAlignment(bam1_t *b, int bounds[16], int reversed) {
+    int strand = getStrand(b, reversed)-1;
     int i, lb, rb;
     uint8_t *qual = bam_get_qual(b);
     uint8_t *seq = bam_get_seq(b);
@@ -337,7 +347,7 @@ char check_mappability(void *data, bam1_t *b) {
 // This is the same as updateMetrics, 1 on methylation, -1 on unmethylation
 int getMethylState(bam1_t *b, int seqPos, Config *config) {
     uint8_t base = bam_seqi(bam_get_seq(b), seqPos);
-    int strand = getStrand(b); //1=OT, 2=OB, 3=CTOT, 4=CTOB
+    int strand = getStrand(b, config->reversed); //1=OT, 2=OB, 3=CTOT, 4=CTOB
 
     if(strand==0) {
         fprintf(stderr, "Can't determine the strand of a read!\n");
@@ -346,10 +356,13 @@ int getMethylState(bam1_t *b, int seqPos, Config *config) {
     //Is the phred score even high enough?
     if(bam_get_qual(b)[seqPos] < config->minPhred) return 0;
 
-    if(base == 2 && (strand==1 || strand==3)) return 1; //C on an OT/CTOT alignment
-    else if(base == 8 && (strand==1 || strand==3)) return -1; //T on an OT/CTOT alignment
-    else if(base == 4 && (strand==2 || strand==4)) return 1; //G on an OB/CTOB alignment
-    else if(base == 1 && (strand==2 || strand==4)) return -1; //A on an OB/CTOB alignment
+    int meth = config->methylated_cytosine_converted ? -1 : 1;
+    int unmeth = -meth;
+
+    if(base == 2 && (strand==1 || strand==3)) return meth; //C on an OT/CTOT alignment
+    else if(base == 8 && (strand==1 || strand==3)) return unmeth; //T on an OT/CTOT alignment
+    else if(base == 4 && (strand==2 || strand==4)) return meth; //G on an OB/CTOB alignment
+    else if(base == 1 && (strand==2 || strand==4)) return unmeth; //A on an OB/CTOB alignment
     return 0;
 }
 
@@ -455,8 +468,8 @@ int filter_func(void *data, bam1_t *b) {
         * higher phred score at that position.
         *
         ***********************************************************************/
-        if(ldata->config->bounds) b = trimAlignment(b, ldata->config->bounds);
-        if(ldata->config->absoluteBounds) b = trimAbsoluteAlignment(b, ldata->config->absoluteBounds);
+        if(ldata->config->bounds) b = trimAlignment(b, ldata->config->bounds, ldata->config->reversed);
+        if(ldata->config->absoluteBounds) b = trimAbsoluteAlignment(b, ldata->config->absoluteBounds, ldata->config->reversed);
         break;
     }
     return rv;

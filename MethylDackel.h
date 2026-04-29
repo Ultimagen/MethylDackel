@@ -93,6 +93,8 @@ typedef struct {
     int keepDiscordant, keepSingleton, ignoreFlags, requireFlags;
     int merge, methylKit, minOppositeDepth;
     int ignoreNH;
+    int reversed;
+    int methylated_cytosine_converted;
     double maxVariantFrac;
     int fraction, counts, logit;
     int cytosine_report;
@@ -160,7 +162,7 @@ typedef struct {
  orientation of each alignment (and whethers it's read #1 or #2 of a pair, if
  applicable) determines the strand.
 */
-int getStrand(bam1_t *b);
+int getStrand(bam1_t *b, int reversed);
 
 /*! @typedef
  @abstract	Positional methylation metrics for a single strand
@@ -178,7 +180,7 @@ typedef struct {
 //bed.c
 int posOverlapsBED(int32_t tid, int32_t pos, bedRegions *regions, int32_t idxBED);
 int spanOverlapsBED(int32_t tid, int32_t start, int32_t end, bedRegions *regions, int32_t *idx);
-int readStrandOverlapsBED(bam1_t *b, bedRegion region);
+int readStrandOverlapsBED(bam1_t *b, bedRegion region, int reversed);
 void sortBED(bedRegions *regions);
 void destroyBED(bedRegions *regions);
 bedRegions *parseBED(char *fn, bam_hdr_t *hdr, int keepStrand);
@@ -223,7 +225,7 @@ int isCHH(char *seq, int pos, int seqlen);
 		since they're otherwise indistinguishable from OT and OB
 		alignments.
 */
-int getStrand(bam1_t *b);
+int getStrand(bam1_t *b, int reversed);
 
 /*! @function
  @abstract The filter function used by all of the internal pileup methods

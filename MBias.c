@@ -181,8 +181,8 @@ void *extractMBias(void *foo) {
             for(i=0; i<n_plp; i++) {
                 if(plp[0][i].is_del) continue;
                 if(plp[0][i].is_refskip) continue;
-                if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[bedIdx])) continue;
-                strand = getStrand((plp[0]+i)->b);
+                if(config->bed) if(!readStrandOverlapsBED(plp[0][i].b, config->bed->region[bedIdx], config->reversed)) continue;
+                strand = getStrand((plp[0]+i)->b, config->reversed);
                 if(strand & 1) {
                     if(base != 'C' && base != 'c') continue;
                 } else {
@@ -298,6 +298,15 @@ void mbias_usage() {
 " --nCTOB INT,INT,INT,INT As with --nOT, but for the original bottom, complementary\n"
 "                  to the original top, and complementary to the original bottom\n"
 "                  strands, respectively.\n"
+" --reversed       Reverse the strand assignment of reads. Use this for libraries\n"
+"                  where the conversion chemistry and/or amplification has\n"
+"                  flipped the expected strand (e.g., TAPS with linear\n"
+"                  amplification). This swaps OT<->OB and CTOT<->CTOB.\n"
+" --methylated-cytosine-converted\n"
+"                  Treat C->T (on OT/CTOT) and G->A (on OB/CTOB) as\n"
+"                  methylated rather than unmethylated cytosines. Use this\n"
+"                  for chemistries where the converted base indicates\n"
+"                  methylation (e.g. TAPS).\n"
 " --version        Print version and the quit\n");
 }
 
@@ -313,7 +322,8 @@ int mbias_main(int argc, char *argv[]) {
     config.minMapq = 10; config.minPhred = 5; config.keepDupes = 0;
     config.keepSingleton = 0, config.keepDiscordant = 0;
     config.filterMappability = 0, config.ignoreNH = 0;
-    
+    config.reversed = 0;
+    config.methylated_cytosine_converted = 0;
     config.fp = NULL;
     config.bai = NULL;
     config.reg = NULL;
@@ -344,6 +354,8 @@ int mbias_main(int argc, char *argv[]) {
         {"keepStrand",   0, NULL,  14},
         {"minConversionEfficiency", 1, NULL, 15},
         {"ignoreNH",     0, NULL,  16},
+        {"reversed",     0, NULL,  17},
+        {"methylated-cytosine-converted", 0, NULL, 18},
         {"ignoreFlags",  1, NULL, 'F'},
         {"requireFlags", 1, NULL, 'R'},
         {"help",         0, NULL, 'h'},
@@ -419,6 +431,12 @@ int mbias_main(int argc, char *argv[]) {
             break;
         case 16:
             config.ignoreNH = 1;
+            break;
+        case 17:
+            config.reversed = 1;
+            break;
+        case 18:
+            config.methylated_cytosine_converted = 1;
             break;
         case 'F' :
             config.ignoreFlags = atoi(optarg);

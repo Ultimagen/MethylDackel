@@ -6,7 +6,7 @@
 #include "htslib/sam.h"
 #include "MethylDackel.h"
 
-int getStrand(bam1_t *b);
+int getStrand(bam1_t *b, int reversed);
 
 // Dictionary of overlapping reads
 KHASH_MAP_INIT_STR(olap_hash, bam1_t *)
@@ -51,7 +51,7 @@ int32_t *calculate_positions(bam1_t *read) {
     return positions;
 }
 
-static void cust_tweak_overlap_quality(bam1_t *a, bam1_t *b) {
+static void cust_tweak_overlap_quality(bam1_t *a, bam1_t *b, int reversed) {
     int ia = 0, ib = 0;
     int32_t na = a->core.l_qseq, nb = b->core.l_qseq;
     int32_t *posa = calculate_positions(a);
@@ -60,8 +60,8 @@ static void cust_tweak_overlap_quality(bam1_t *a, bam1_t *b) {
     uint8_t *a_seq  = bam_get_seq(a), *b_seq = bam_get_seq(b);
 
     //If alignments are on opposite strands then exit
-    int sa = getStrand(a);
-    int sb = getStrand(b);
+    int sa = getStrand(a, reversed);
+    int sb = getStrand(b, reversed);
     if(((sa-sb)&1) == 1) goto quit;
 
     //Go to the first mapped position
@@ -131,7 +131,7 @@ int custom_overlap_constructor(void *data, const bam1_t *b, bam_pileup_cd *cd) {
         kh_value(ohash, k) = b;
     } else {
         a = kh_value(ohash, k);
-        cust_tweak_overlap_quality(a, b);
+        cust_tweak_overlap_quality(a, b, foo->config->reversed);
         kh_del(olap_hash, ohash, k);
     }
     return 0;
